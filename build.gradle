@@ -12,13 +12,12 @@ buildscript {
     dependencies {
         classpath('com.github.jengelman.gradle.plugins:gradle-processes:0.3.0')
         classpath("org.springframework.boot:spring-boot-gradle-plugin:${springBootVersion}")
-        classpath 'au.com.dius:pact-jvm-provider-gradle_2.11:2.1.13'
+        classpath("au.com.dius:pact-jvm-provider-gradle_2.11:3.5.14")
     }
 }
 
 allprojects {
     apply plugin: 'java'
-    apply plugin: 'idea'
 
     repositories {
         mavenCentral()
@@ -28,16 +27,6 @@ allprojects {
 
     ext {
         versionFilePath = "$System.env.VERSION_FILE_PATH"
-    }
-
-    task loadVersion {
-        ext.myVersion = new File("${versionFilePath}/number").text
-    }
-
-    task manifestFilter(type: Copy) {
-        from 'manifest.yml'
-        into new File("$projectDir/../../versioned-manifest")
-        expand(version: "${loadVersion.myVersion}")
     }
 
 }
@@ -51,22 +40,29 @@ subprojects {
     dependencies {
         compile("org.springframework.boot:spring-boot-starter-web")
         testCompile("org.springframework.boot:spring-boot-starter-test")
-        testCompile("au.com.dius:pact-jvm-consumer-junit_2.11:2.1.13")
+        testCompile("au.com.dius:pact-jvm-consumer-junit_2.11:3.5.14")
     }
 }
 
 project(':microservices-pact-consumer') {
+    apply plugin: 'au.com.dius.pact'
+
+    version = '0.1.6'
+
     test {
-      systemProperties['pact.rootDir'] = "$projectDir/../../pacts"
+        systemProperties['pact.rootDir'] = "$projectDir/build/pacts"
     }
 
     jar {
         baseName = 'microservices-pact-consumer'
-        destinationDir = new File("$projectDir/../../libs")
+        destinationDir = new File("$projectDir/build/libs")
     }
 
-    jar.doFirst {
-        version = new File("${versionFilePath}/number").text
+    pact {
+        publish {
+            pactBrokerUrl = 'http://localhost:80'
+            tags = ["${project.version}", "abcd"]
+        }
     }
 }
 
@@ -75,12 +71,14 @@ project(':microservices-pact-provider') {
     apply plugin: 'au.com.dius.pact'
     apply plugin: 'com.github.johnrengelman.processes'
 
+    version = '0.1.1'
+
     ext {
         pactFilePath = "$System.env.PACT_FILE"
     }
 
     task startProvider(type: com.github.jengelman.gradle.plugins.processes.tasks.JavaFork) {
-        classpath = files("$projectDir/../../provider-libs/microservices-pact-provider-${version}.jar")
+        classpath = files("$projectDir/build/provider-libs/microservices-pact-provider-${version}.jar")
         classpath += sourceSets.main.runtimeClasspath
         main = 'io.pivotal.microservices.pact.provider.Application'
         doLast {
@@ -94,21 +92,13 @@ project(':microservices-pact-provider') {
 
     jar {
         baseName = 'microservices-pact-provider'
-        destinationDir = new File("$projectDir/../../provider-libs")
-    }
-
-    jar.doFirst {
-        version = new File("${versionFilePath}/number").text
+        destinationDir = new File("$projectDir/build/provider-libs")
     }
 
     pact {
         serviceProviders {
-            fooProvider {
-                startProviderTask = 'startProvider'
-                terminateProviderTask = 'stopProvider'
-                hasPactWith('fooConsumer') {
-                    pactFile = file(pactFilePath)
-                }
+            Foo_Provider {
+                hasPactsFromPactBrokerWithTag('http://localhost:80/', '0.1.6')
             }
         }
     }

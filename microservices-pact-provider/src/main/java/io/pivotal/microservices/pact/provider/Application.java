@@ -25,6 +25,6 @@ public class Application {
 
     @RequestMapping(value = "/foos", method = RequestMethod.GET)
     public ResponseEntity<List<Foo>> foos() {
-        return new ResponseEntity<>(Arrays.asList(new Foo(42), new Foo(100)), HttpStatus.OK);
+        return new ResponseEntity<>(Arrays.asList(new Foo(45), new Foo(101)), HttpStatus.OK);
     }
 }
